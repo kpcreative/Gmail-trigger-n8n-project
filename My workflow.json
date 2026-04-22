@@ -1,0 +1,681 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fbabed8a-c3dd-4b60-8cd4-967e8260fc69",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xMCYACWYkkw80BRg",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f59e3c7e-d719-48ee-8b8a-a3f2161a0e1c",
+              "name": "EmailBody",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "86b77488-80e0-4650-86ab-49d3c2d1e3b2",
+              "name": "threadId",
+              "value": "={{ $json.threadId }}",
+              "type": "string"
+            },
+            {
+              "id": "c552f769-6339-47ca-9f8f-70535c037e23",
+              "name": "from",
+              "value": "={{ $json.from.value[0].address }}",
+              "type": "string"
+            },
+            {
+              "id": "30b0fa3d-6471-4b7d-8a6a-8704aa632083",
+              "name": "Subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "001f9bb6-22a7-4170-94af-3aa58f9179fd",
+              "name": "sender",
+              "value": "={{ $json.from.value[0].name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "e48db25d-6d53-44d2-a57d-709933d09122",
+      "name": "Set content"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=New Email:\n{{ $json.original_email }}\n\nSender Name:\n{{ $json.sender_name }}\n\n---\n\nSimilar Examples:\n{{ $json.context }}\n\n---\n\nInstructions:\n- If similar examples are provided, use them only for tone and structure\n- If no examples are available, generate reply using only the new email\n- Do NOT copy examples\n- Keep it concise and professional\n\nStart the email with:\nHi {{ $json.sender_name || \"there\" }},\n\nReturn only the email reply.",
+        "options": {
+          "systemMessage": "=You are an intelligent email assistant.\n\nYour job is to follow this instructions:\nInstructions:\n- If similar examples are provided, use them only for tone and structure\n- If no examples are available, generate reply using only the new email\n- Do NOT copy examples\n- Keep it concise and professional (max 5–8 lines)\n\nFORMATTING RULES:\n- Write in plain text only (no markdown, no special symbols like *, _, #, etc.)\n- Use simple paragraphs by default\n- If the response requires steps or multiple actions, you may use numbering (1, 2, 3)\n- Do NOT use markdown formatting like **bold**, bullet points (*, -), or special characters\n- Keep formatting simple and clean for readability in messaging apps\n\nTONE:\n- Human, natural, and professional\n- Avoid over-explaining\n- Do not sound like documentation\n\nStart the email with:\nHi {{ $json.sender_name || \"there\" }},\n\nReturn only the email reply."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1472,
+        -208
+      ],
+      "id": "fb414065-869c-4e99-aaba-907f64900351",
+      "name": "Email agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        96
+      ],
+      "id": "256171f2-fb0e-44d0-819c-970ac96c72b0",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "O4FhaPLqztyheRVR",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "emails_memory",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "email_text",
+              "fieldValue": "={{ $('Set content').item.json.EmailBody }}"
+            },
+            {
+              "fieldId": "ai_reply",
+              "fieldValue": "={{ $('Send a message').item.json.data.text }}"
+            },
+            {
+              "fieldId": "embedding",
+              "fieldValue": "={{ $node[\"final\"].json.data[0].embedding }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3408,
+        112
+      ],
+      "id": "e6e7a15f-fb37-4439-adc1-deca6490ba21",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "GagXQ5Y4DDyKI9qH",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_OPENROUTER_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.io"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"text-embedding-3-small\",\n  \"input\": {{ JSON.stringify($json.EmailBody) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "1933eb91-d191-4075-a491-e83678c64365",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_SUPABASE_PROJECT_ID.supabase.co/rest/v1/rpc/match_emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"query_embedding\":$json.embedding,\n  \"match_count\": 3\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "2f91363e-f512-46df-b951-386edb7b9e0c",
+      "name": "search"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2529966e-f155-4bf1-b435-c48fb1dc92ae",
+              "name": "embedding",
+              "value": "={{ $node[\"HTTP Request\"].json.data[0].embedding }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        0
+      ],
+      "id": "672f9245-113c-4e01-a638-bf2a8cb507ed",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "961f8dbd-73eb-4d52-8aa4-84c95e87d222",
+              "name": "context",
+              "value": "={{ \n  $items(\"search\")\n    .filter(item => item.json.similarity > 0.8)\n    .slice(0,2)\n    .map(item => item.json.email_text + \"\\nReply:\\n\" + item.json.ai_reply)\n    .join(\"\\n\\n---\\n\\n\") \n  || \"\"\n}}",
+              "type": "string"
+            },
+            {
+              "id": "f7a03cfa-8746-4eb3-a600-d8094654f03c",
+              "name": "original_email",
+              "value": "={{ $('Set content').first().json.EmailBody }}",
+              "type": "string"
+            },
+            {
+              "id": "dfa03632-baae-4f80-ad25-14cc4296fd55",
+              "name": "sender_name",
+              "value": "={{ $('Set content').item.json.sender || \"there\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "0c0d7277-0579-4985-a99c-048e7a2c5baa",
+      "name": "Prepare Context",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "={{ $('Gmail Trigger').item.json.to.value[0].address }}",
+        "subject": "Review Reply Before Sending",
+        "message": "=Please review and edit this reply before sending:\n\n-----------------------------------\n\n{{ $('Email agent').item.json.output }}\n\n\n-----------------------------------\n\n👉 Edit this message and send your final version.",
+        "responseType": "freeText",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2224,
+        -176
+      ],
+      "id": "0ee8b16b-e43d-438e-8c62-867f6b51201f",
+      "name": "Send a message",
+      "webhookId": "4785759c-149f-47bd-848a-1de475d84bcb",
+      "executeOnce": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xMCYACWYkkw80BRg",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Gmail Trigger').item.json.from.value[0].address }}",
+        "subject": "=Re:{{ $('Set content').item.json.Subject }}",
+        "emailType": "text",
+        "message": "={{ $json.data.text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2592,
+        -176
+      ],
+      "id": "c90f61b4-3c33-4a74-884b-d4223b09fea6",
+      "name": "Send a message1",
+      "webhookId": "f4ca2d95-e7cc-4573-a800-3148e9a6c40b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xMCYACWYkkw80BRg",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_OPENROUTER_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.io"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"text-embedding-3-small\",\n  \"input\": {{ JSON.stringify($('Send a message').item.json.data.text) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2944,
+        -160
+      ],
+      "id": "056d0263-62a6-4f91-8fd9-f53d77bc2015",
+      "name": "final"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "14cb122b-6675-4c24-bcd2-63131cc7445f",
+              "leftValue": "={{ $json.from.value[0].address }}",
+              "rightValue": "={{ $json.to.value[0].address }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "a4f58e1f-26ce-4c28-b08a-ec09983c1854",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "1292229720",
+        "text": "=📩 A new email has been received, Please Check and Respond to \"Review Reply Before Sending\"\n\n🕒 Time: {{ new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) }}\n\n🤖Reply That got by AI:\n\n{{ $json.safeText }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1824,
+        400
+      ],
+      "id": "7bba3d25-e265-403b-b598-dd584e7d3572",
+      "name": "response",
+      "webhookId": "ec92d491-a137-472f-842f-3298924946a0",
+      "credentials": {
+        "telegramApi": {
+          "id": "2dxIqlzJTppbY63v",
+          "name": "send"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      safeText: $input.first().json.output\n        // Remove markdown symbols\n        .replace(/[*_#`~]/g, '')\n        \n        // Remove escape slashes\n        .replace(/\\\\/g, '')\n        \n        // Fix things like \"1\\. → 1.\"\n        .replace(/(\\d+)\\./g, '$1.')\n        \n        // Fix spacing before punctuation (but keep new lines)\n        .replace(/[ \\t]+([.,])/g, '$1')\n        \n        // Trim only start/end (NOT internal spacing)\n        .trim()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        -208
+      ],
+      "id": "bacee13a-b065-43be-bff0-d2f01126e0db",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {
+    "Gmail Trigger": [
+      {
+        "json": {
+          "id": "19dace7cb2212af5",
+          "threadId": "19dace7cb2212af5",
+          "labelIds": [
+            "UNREAD",
+            "IMPORTANT",
+            "CATEGORY_PERSONAL",
+            "INBOX"
+          ],
+          "sizeEstimate": 8153,
+          "headers": {
+            "delivered-to": "Delivered-To: kartikkumarpandey008@gmail.com",
+            "received": "Received: from mail-sor-f41.google.com (mail-sor-f41.google.com. [209.85.220.41])\r\n        by mx.google.com with SMTPS id d9443c01a7336-2b5fa9f00f9sor51052175ad.2.2026.04.20.14.59.25\r\n        for <kartikkumarpandey008@gmail.com>\r\n        (Google Transport Security);\r\n        Mon, 20 Apr 2026 14:59:25 -0700 (PDT)",
+            "x-received": "X-Received: by 2002:a17:902:bd44:b0:2b2:5da8:14be with SMTP id\r\n d9443c01a7336-2b5f9fcd9eemr112885985ad.41.1776722364455; Mon, 20 Apr 2026\r\n 14:59:24 -0700 (PDT)",
+            "arc-seal": "ARC-Seal: i=1; a=rsa-sha256; t=1776722364; cv=none;\r\n        d=google.com; s=arc-20240605;\r\n        b=fF/xWQPDx+7ScneJxs8ccnqNtooSfBh3xKy/gLqiVWxHgLJ4ZxAbEWUTJUINWYeBt6\r\n         MhdZWORvR0GjUBYj9FHnMnyCW6zvoTJHeoLV2YAbP8d3NfhbPwCM1fMtwX1hRvcy6ASq\r\n         37H0DHlt5M9AzxXzVMlrpMXBp1H3kgvSImlY93QmK8ABR/J7/7Hq55nxExHASEbN8+Ue\r\n         coo8U987sgh1NLA7JJwUa9g13+jYLcUzE8QFuNU0vfZUDQk0lL/fPaDfN/8mM094bH5s\r\n         BoGbjnIEiOgXDwUa7BUx7uIIInL9haXlyhLJHMNKmv6/TZreooT8TSNvnv8H+OS/Ozvt\r\n         Ry2w==",
+            "arc-message-signature": "ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;\r\n        h=to:subject:message-id:date:from:mime-version:dkim-signature;\r\n        bh=J/qOing5hsXBZU309NFsGxDUm0iAbzuT6H0/GhckkkA=;\r\n        fh=Foe21lZDuTv3efme3q6KH0+R7mUho0IkInUDKl24cxE=;\r\n        b=BNq02SIcfXZId3EBONa1jhmI5CsgLwpSC7pmOwEjSMSbDcsppCDQETGvVydTYw/SOT\r\n         cgzKcRj1Ak/nBeoxX4WLKn+dU6JBinc3JgPfsq6QergdhtS7jH9idxAFXoKiklk1h325\r\n         D64mHAAySV1BS5QSrrgYsApaZIvkcWQCc9ylZXDc0SilQFcVQ2ConnfC1gopNSV5Cx8u\r\n         beYjZdcsxPD4aMgyjPrn2YG4HqIsqfY0aZqiDAE3yFAmwzm7OkxBr6eum+jkCI/44PdC\r\n         dJZTJMZNHCtEEqkKIqHUOrSjRZh3ILs6jEiA1yI5P9KjCqcYGPw51+8USBOCOIDUqtwu\r\n         CQuA==;\r\n        dara=google.com",
+            "arc-authentication-results": "ARC-Authentication-Results: i=1; mx.google.com; arc=none",
+            "return-path": "Return-Path: <kamalnayankumar008@gmail.com>",
+            "received-spf": "Received-SPF: pass (google.com: domain of kamalnayankumar008@gmail.com designates 209.85.220.41 as permitted sender) client-ip=209.85.220.41;",
+            "authentication-results": "Authentication-Results: mx.google.com;\r\n       dkim=pass header.i=@gmail.com header.s=20251104 header.b=FzVjzMGz;\r\n       arc=pass (i=1);\r\n       spf=pass (google.com: domain of kamalnayankumar008@gmail.com designates 209.85.220.41 as permitted sender) smtp.mailfrom=kamalnayankumar008@gmail.com;\r\n       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com;\r\n       dara=pass header.i=@gmail.com",
+            "dkim-signature": "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;\r\n        d=gmail.com; s=20251104; t=1776722364; x=1777327164; dara=google.com;\r\n        h=to:subject:message-id:date:from:mime-version:from:to:cc:subject\r\n         :date:message-id:reply-to;\r\n        bh=J/qOing5hsXBZU309NFsGxDUm0iAbzuT6H0/GhckkkA=;\r\n        b=FzVjzMGz9592Ril13iY9cUAsZm5U7JsBs9rHbS+uls9pL6aN0A5JG6zd1es16vjbZV\r\n         CtzLKL6HKraiideMy/KJqDZQq8a3WBx7DS4BwpyTMhFxCoSY5WwnUk6OqZ0apA9gZKej\r\n         yxNTFdW0gVZKAb9UPeyFwpDg2YA3pH+heWLyloOdAqpoQfR74I4BVLdoTNLwW5NXnl7k\r\n         Z7LBKfYzRtapmrPeFV/g6nzCF7kT14d7wfFCKhSncAkgsm52MCBP9n8VCvpDtBVBdkXy\r\n         7KuTmDTR/jtxyexoEf2blo2z2vLA8F1ZYb/+VXNjWDjPLKuBojXR3RfktY3E1f0znFkO\r\n         1LYw==",
+            "x-google-dkim-signature": "X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;\r\n        d=1e100.net; s=20251104; t=1776722364; x=1777327164;\r\n        h=to:subject:message-id:date:from:mime-version:x-gm-gg\r\n         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;\r\n        bh=J/qOing5hsXBZU309NFsGxDUm0iAbzuT6H0/GhckkkA=;\r\n        b=cb8nQMYCxurw2p8SjbFtyLK5i3trMTmSPiWhVBlvp5FVj/9U5kzXwpAwUo2f1oAtiA\r\n         vEvzHIfBU1wNnoR9B3OS4OIs5aT8+xJ7O70g+G1ixYvLec8LLgVzoXv/JHXjzS4ot4O+\r\n         352AZdZdDTItRfU1bSYzWgMgWOssyzAHDUyDwPrwj+OFktwuP4oXDMO+eP4KbeStlxIy\r\n         1tBP82mNwHFGfmHV/d8d1+BeWsSm1BLaBY2FafzLO7kj5GbrHserXRKNgsaBqjVeyEmR\r\n         p10XdFXFObEDkQsSFAEYqFbryIRL5E3c5JBM3tOyQg4ONgyoLIYAT/PxOSzSn1ia8rcf\r\n         4dug==",
+            "x-gm-message-state": "X-Gm-Message-State: AOJu0Yy49JXJ3Y50Smb46dI0Cs2BW+5E5eGdoXWtXEMJcQ0dovCyLShV\r\n\txhpMW1YzEVB20S+mKfejwqcBt3XM3KLrJrDTO422wmstMm87vEoVScLvvA7vtO7caFooypWDfnA\r\n\tVJIHUMvR3a5JkYHse3/DabKmlJktkAoZdq5K4U54=",
+            "x-gm-gg": "X-Gm-Gg: AeBDiev8PmyE6403Qes5icOkamIgMWsinM1IfPalNf5+buT1sPFdj1Q5eOK1sWK7clM\r\n\thndx6KlgaSQShbfwmYapBrpC30m+Vfdoa6Js1SwCcPOTzqUeYY56etT8xtTfa56KtKKuqrvrMq6\r\n\t5C/WT+xZ9H6FjZ0PTPHqUlg2qDarug6yzWrJ8KqLmpQLMipY4ORDBmT1brl3Lt2kcitpq+yAxOv\r\n\tVO9rZRBO54lmOlfguOG9q+okMNpWPHmg9gmcsZQ7/OyPAyqAE8RaYes93f4yaz6pJSQv4n+f5zC\r\n\t7LvFshcwTTR31P4tA8c3f/X+jltaAqYVFXBN1kUh8qk3CSDTqkU=",
+            "mime-version": "MIME-Version: 1.0",
+            "from": "From: KP creative <kamalnayankumar008@gmail.com>",
+            "date": "Date: Tue, 21 Apr 2026 03:29:13 +0530",
+            "x-gm-features": "X-Gm-Features: AQROBzDinNgggRjQwWIiU4wYpluzq7K3VhjYydHhVVn3mA1VB1gxeAcouKjIJEw",
+            "message-id": "Message-ID: <CAO5O1cR+He-0O-ZczUES9-=9u666Kb8By_aRDbQGoif0FT7oOw@mail.gmail.com>",
+            "subject": "Subject: exam",
+            "to": "To: kartikkumarpandey008@gmail.com",
+            "content-type": "Content-Type: multipart/alternative; boundary=\"00000000000065df8d064feb692a\""
+          },
+          "html": "<div dir=\"ltr\"><p class=\"gmail-isSelectedEnd\">Hi Kartik,</p><p class=\"gmail-isSelectedEnd\">I hope you are doing well.</p><p class=\"gmail-isSelectedEnd\">I wanted to share some important information regarding the upcoming exam. Please make sure to check the schedule carefully and be aware of the syllabus and guidelines provided. It is advised to revise all the key topics and be prepared in advance.</p><p class=\"gmail-isSelectedEnd\">If there are any updates or changes, they will be communicated to you accordingly.</p><p class=\"gmail-isSelectedEnd\">Feel free to reach out if you have any questions or need clarification.</p><p>Best regards,</p></div>\n",
+          "text": "Hi Kartik,\n\nI hope you are doing well.\n\nI wanted to share some important information regarding the upcoming exam.\nPlease make sure to check the schedule carefully and be aware of the\nsyllabus and guidelines provided. It is advised to revise all the key\ntopics and be prepared in advance.\n\nIf there are any updates or changes, they will be communicated to you\naccordingly.\n\nFeel free to reach out if you have any questions or need clarification.\n\nBest regards,\n",
+          "textAsHtml": "<p>Hi Kartik,</p><p>I hope you are doing well.</p><p>I wanted to share some important information regarding the upcoming exam.<br/>Please make sure to check the schedule carefully and be aware of the<br/>syllabus and guidelines provided. It is advised to revise all the key<br/>topics and be prepared in advance.</p><p>If there are any updates or changes, they will be communicated to you<br/>accordingly.</p><p>Feel free to reach out if you have any questions or need clarification.</p><p>Best regards,</p>",
+          "subject": "exam",
+          "date": "2026-04-20T21:59:13.000Z",
+          "to": {
+            "value": [
+              {
+                "address": "kartikkumarpandey008@gmail.com",
+                "name": ""
+              }
+            ],
+            "html": "<span class=\"mp_address_group\"><a href=\"mailto:kartikkumarpandey008@gmail.com\" class=\"mp_address_email\">kartikkumarpandey008@gmail.com</a></span>",
+            "text": "kartikkumarpandey008@gmail.com"
+          },
+          "from": {
+            "value": [
+              {
+                "address": "kamalnayankumar008@gmail.com",
+                "name": "KP creative"
+              }
+            ],
+            "html": "<span class=\"mp_address_group\"><span class=\"mp_address_name\">KP creative</span> &lt;<a href=\"mailto:kamalnayankumar008@gmail.com\" class=\"mp_address_email\">kamalnayankumar008@gmail.com</a>&gt;</span>",
+            "text": "\"KP creative\" <kamalnayankumar008@gmail.com>"
+          },
+          "messageId": "<CAO5O1cR+He-0O-ZczUES9-=9u666Kb8By_aRDbQGoif0FT7oOw@mail.gmail.com>"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set content": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Email agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search": {
+      "main": [
+        [
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Context": {
+      "main": [
+        [
+          {
+            "node": "Email agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "final": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Set content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        []
+      ]
+    },
+    "response": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "1d92e84e-e9af-43a9-8cc8-64ae7087fe43",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8a09c649c1ca5ee193c5ecf652c77374d7e035ea819c1757d5d730fe55d0b8d4"
+  },
+  "id": "5OvMPkmDpOeODHWb",
+  "tags": []
+}
