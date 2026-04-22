@@ -5,15 +5,20 @@ An n8n workflow that automatically reads incoming Gmail messages, retrieves simi
 ## How It Works
 
 ```
-Gmail Trigger
-    → Set content (extract body, subject, sender)
-    → HTTP Request (embed email via OpenRouter text-embedding-3-small)
-    → Edit Fields (store embedding)
-    → Search (vector similarity search in Supabase)
-    → Prepare Context (build prompt with top-3 similar examples)
-    → Email Agent (LLM on OpenRouter generates reply)
-    → Send reply (Gmail)
-    → Create a row (save email + reply + embedding to Supabase for future use)
+Step	n8n Node	Kya karta hai
+1	Gmail Trigger	Naya email aaya → workflow start
+2	If	Check karta hai ki sender ≠ receiver (self-loop se bachne ke liye)
+3	Set content	Email body, subject, sender name nikalta hai
+4	HTTP Request (Embedding)	Email ka embedding banata hai (OpenRouter API se)
+5	Search (Supabase)	Purane similar emails dhundhta hai vector similarity se
+6	Prepare Context	Similar examples + original email combine karta hai
+7	Email Agent (AI)	AI se reply generate karta hai
+8	Code (JS)	Markdown symbols hatata hai reply se
+9	Telegram	Telegram pe notification bhejta hai
+10	Gmail (Send & Wait)	Tujhe review ke liye email bhejta hai
+11	Gmail (Final Send)	Approved reply original sender ko bhejta hai
+12	HTTP Request (Final Embedding)	Final reply ka embedding banata hai
+13	Supabase (Create Row)	Email + reply + embedding save karta hai future ke liye
 ```
 
 ## Features
